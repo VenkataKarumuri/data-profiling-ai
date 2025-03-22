@@ -46,36 +46,56 @@ def submit_validation():
         # Retrieve Customer ID from the data and insert the result as a new row in the Treeview table
         customer_id = row_data.get('Customer_ID', f"Row {index+1}")  # Retrieve Customer ID
 
+        # Alternate row color (odd or even row)
+        tag = "odd" if index % 2 == 0 else "even"
+
         # Insert row into the Treeview with Customer ID instead of Transaction ID
         treeview.insert('', 'end', values=(
             customer_id,
             ', '.join(errors) if errors else 'No Errors',
             ', '.join(remediation_actions) if remediation_actions else 'No Actions',
             risk_score
-        ))
+        ), tags=(tag,))
+
+    # Apply custom style for alternating row colors
+    treeview.tag_configure("odd", background="#f4f4f9")  # Light gray color for odd rows
+    treeview.tag_configure("even", background="#e6f7ff")  # Light blue color for even rows
 
 # Function to create the Tkinter UI
 def create_ui():
     # Set up the root window
     root = tk.Tk()
     root.title("Data Validation UI")
-    root.geometry("800x600")
+    root.geometry("1000x700")
+    root.configure(bg="#f4f4f9")  # Light background color for the window
+
+    # Heading (Main Title)
+    header_frame = tk.Frame(root, bg="#3b5998", pady=20)
+    header_frame.pack(fill="x")
+
+    # Technology Hackathon Title
+    title_label = tk.Label(header_frame, text="Technology Hackathon", font=("Helvetica", 26, "bold"), fg="white", bg="#3b5998")
+    title_label.pack()
+
+    # Subtitle (Gen-AI Based Data Profiling)
+    subtitle_label = tk.Label(header_frame, text="Gen-AI Based Data Profiling", font=("Helvetica", 18), fg="white", bg="#3b5998")
+    subtitle_label.pack()
 
     # Create and place the upload button
-    upload_button = tk.Button(root, text="Upload CSV", command=load_csv, font=("Arial", 14), bg="lightblue")
+    upload_button = tk.Button(root, text="Upload CSV", command=load_csv, font=("Arial", 14), bg="#4CAF50", fg="white", relief="solid", bd=2)
     upload_button.pack(pady=10)
 
     # Status label to show file load status
     global status_label
-    status_label = tk.Label(root, text="No file uploaded", font=("Arial", 12), fg="red")
+    status_label = tk.Label(root, text="No file uploaded", font=("Arial", 12), fg="red", bg="#f4f4f9")
     status_label.pack(pady=10)
 
     # Create and place the submit button to trigger validation
-    submit_button = tk.Button(root, text="Submit for Validation", command=submit_validation, font=("Arial", 14), bg="lightgreen")
+    submit_button = tk.Button(root, text="Submit for Validation", command=submit_validation, font=("Arial", 14), bg="#4CAF50", fg="white", relief="solid", bd=2)
     submit_button.pack(pady=20)
 
     # Create the frame for the table
-    table_frame = tk.Frame(root)
+    table_frame = tk.Frame(root, bg="#f4f4f9")
     table_frame.pack(pady=20, fill="both", expand=True)
 
     # Define columns for the table
@@ -83,7 +103,7 @@ def create_ui():
 
     # Create Treeview widget for the table with scrollbars
     global treeview
-    treeview = ttk.Treeview(table_frame, columns=columns, show='headings')
+    treeview = ttk.Treeview(table_frame, columns=columns, show='headings', style="Treeview")
 
     # Define column headings
     for col in columns:
@@ -102,6 +122,16 @@ def create_ui():
 
     # Pack the Treeview into the frame
     treeview.pack(fill="both", expand=True)
+
+    # Add some custom styles for the treeview
+    style = ttk.Style()
+    style.configure("Treeview",
+                    background="#f9f9f9",
+                    foreground="black",
+                    rowheight=25,
+                    fieldbackground="#f9f9f9")
+    style.map('Treeview',
+              background=[('selected', '#4CAF50')])
 
     # Run the Tkinter main loop to display the UI
     root.mainloop()
