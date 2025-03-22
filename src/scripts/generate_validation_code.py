@@ -1,9 +1,10 @@
 from jinja2 import Template
 import pycountry
+from datetime import datetime, timedelta
 
-# Define the validation code template, including dynamic risk scoring based on transaction patterns and historic violations
+# Define the validation code template, including the new date validation conditions
 validation_code_template = """
-def validate_data(data, historic_violations={}):
+def validate_data(data, historic_violations={}, max_days_old=180):
     errors = []
     remediation_actions = []
     risk_score = 0  # Start with a base risk score
@@ -39,6 +40,31 @@ def validate_data(data, historic_violations={}):
             remediation_actions.append("Action: Investigate negative balance. If it's a valid overdraft, ensure 'Account_Flag' is set to 'OD'.")
             risk_score += 4  # High risk for negative balance without OD flag
 
+    # Validate Transaction Date - should not be in the future
+    if 'Transaction_Date' not in data:
+        errors.append("Transaction Date is required")
+        remediation_actions.append("Action: Ensure 'Transaction_Date' is provided.")
+        risk_score += 2  # Increase risk score if Transaction Date is missing
+    else:
+        transaction_date = datetime.strptime(data['Transaction_Date'], '%Y-%m-%d')  # Assuming format 'YYYY-MM-DD'
+        
+        # Check if the transaction date is in the future
+        if transaction_date > datetime.now():
+            errors.append("Transaction Date cannot be in the future")
+            remediation_actions.append("Action: Review the transaction date and correct any future dates.")
+            risk_score += 3  # Increase risk score for future dates
+        
+        # Check if the transaction is older than max_days_old (180 days in this example)
+        if (datetime.now() - transaction_date).days > max_days_old:
+            errors.append(f"Transaction is older than {max_days_old} days, triggering validation alert")
+            remediation_actions.append(f"Action: Review the transaction for validity if older than {max_days_old} days.")
+            risk_score += 3  # Increase risk score for older transactions
+
+    # Validate Currency - should be a valid ISO 4217 code
+    if 'Currency' not in data or not is_valid_currency(data['Currency']):
+        errors.append("Currency should be a valid ISO 4217 currency code")
+        remediation_actions.append("Action: Ensure the currency code is valid and follows ISO 4217 standards.")
+        risk_score += 2  # Increase risk score for invalid currency
 
     # Validate cross-border transaction limits (for simplicity, assuming a cross-border flag is set)
     if 'is_cross_border' in data and data['is_cross_border']:
@@ -59,8 +85,16 @@ def validate_data(data, historic_violations={}):
     return errors, remediation_actions, risk_score
 
 
+def is_valid_currency(currency_code):
+    try:
+        # Check if the currency code exists in the ISO 4217 list using pycountry
+        pycountry.currencies.get(alpha_3=currency_code)
+        return True
+    except:
+        return False
 """
 
+# Function to generate the validation code
 def generate_code():
     # Generate validation code based on the template
     template = Template(validation_code_template)
@@ -72,5 +106,6 @@ def generate_code():
 
     print("Validation code has been generated and saved to 'generated_validation_code.py'")
 
+# Main function to generate the validation code
 if __name__ == "__main__":
     generate_code()
