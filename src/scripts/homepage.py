@@ -3,11 +3,23 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk  # Import ttk for Treeview widget
 import pandas as pd
 from generated_validation_code import validate_data  # Import validate_data function
-import json
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
+import threading  # To run GPT-2 generation in a separate thread
+
+# Load GPT-2 model and tokenizer
+model = GPT2LMHeadModel.from_pretrained("gpt2")
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+
+# Function to generate remediation explanation using GPT-2
+def generate_remediation_explanation(error_message):
+    input_text = f"Explain why the following error might have occurred in a financial transaction: {error_message}"
+    inputs = tokenizer.encode(input_text, return_tensors="pt")
+    outputs = model.generate(inputs, max_length=100, num_return_sequences=1)
+    explanation = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return explanation
 
 # Function to load the CSV file
 def load_csv():
-    # Open file dialog to select CSV
     file_path = filedialog.askopenfilename(filetypes=[("CSV Files", "*.csv")])
     if file_path:
         try:
@@ -36,18 +48,12 @@ def submit_validation():
         '0987654321': 1   # Customer 0987654321 has 1 previous violation
     }
 
-    # Iterate over each row in the CSV data and validate
-    for index, row in csv_data.iterrows():
-        row_data = row.to_dict()  # Convert row to dictionary
-
+    def validate_and_insert_row(index, row_data):
         # Validate the data using the generated function (validate_data)
         errors, remediation_actions, risk_score = validate_data(row_data, historic_violations)
 
         # Retrieve Customer ID from the data and insert the result as a new row in the Treeview table
-        customer_id = row_data.get('Customer_ID', f"Row {index+1}")  # Retrieve Customer ID
-
-        # Alternate row color (odd or even row)
-        tag = "odd" if index % 2 == 0 else "even"
+        customer_id = row_data.get('Customer_ID', f"Row {index + 1}")  # Retrieve Customer ID
 
         # Insert row into the Treeview with Customer ID instead of Transaction ID
         treeview.insert('', 'end', values=(
@@ -55,11 +61,26 @@ def submit_validation():
             ', '.join(errors) if errors else 'No Errors',
             ', '.join(remediation_actions) if remediation_actions else 'No Actions',
             risk_score
-        ), tags=(tag,))
+        ))
 
-    # Apply custom style for alternating row colors
-    treeview.tag_configure("odd", background="#f4f4f9")  # Light gray color for odd rows
-    treeview.tag_configure("even", background="#e6f7ff")  # Light blue color for even rows
+    def generate_and_insert_explanations():
+        for index, row in csv_data.iterrows():
+            row_data = row.to_dict()  # Convert row to dictionary
+
+            # For each validation error, generate a GPT-2 explanation and add it to remediation actions
+            errors, remediation_actions, risk_score = validate_data(row_data, historic_violations)
+
+            for error in errors:
+                # Generate detailed explanation for the error using GPT-2
+                explanation = generate_remediation_explanation(error)
+                remediation_actions.append(f"Explanation: {explanation}")
+
+            # Insert the row with validation data into the table
+            validate_and_insert_row(index, row_data)
+
+    # Run the GPT-2 generation and validation in a separate thread
+    validation_thread = threading.Thread(target=generate_and_insert_explanations)
+    validation_thread.start()
 
 # Function to create the Tkinter UI
 def create_ui():
